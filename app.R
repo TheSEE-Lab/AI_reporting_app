@@ -49,7 +49,7 @@ taxC_choices_glob <- list(
 js <- "Shiny.addCustomMessageHandler('setGenerated', function(message) {\n  var ta = document.getElementById('generated_text');\n  if(ta){\n    ta.value = message.value || '';\n  }\n});"
 
 # JS handler to toggle disabled state of inputs except the 'negative' checkbox
-toggle_js <- 'Shiny.addCustomMessageHandler("toggleInputs", function(message) { var disable = !!message.disable; var elems = document.querySelectorAll("input, textarea, select"); elems.forEach(function(el){ if(el.id === "negative") return; el.disabled = disable; }); });'
+toggle_js <- 'Shiny.addCustomMessageHandler("toggleInputs", function(message) { var disable = !!message.disable; var elems = document.querySelectorAll("input, textarea, select"); elems.forEach(function(el){ if(el.id === "negative" || el.id === "negative_disclosure") return; el.disabled = disable; }); });'
 
 # JS handler to validate date format
 validate_date_js <- '
@@ -65,13 +65,6 @@ $(document).on("blur", "input[id^=\'ai_date_\']", function() {
 '
 
 ui <- fluidPage(
-  titlePanel("AI usage reporting framework: AI disclosure for Improved Transparency"),
-  h1(""),
-  # Clear all inputs button
-  tags$div(
-    style = "margin-bottom: 10px;",
-    actionButton("clear_all", "Clear all inputs", class = "btn-warning")
-  ),
   # add custom JS handler for setting the generated textarea value
   tags$head(
     tags$script(HTML(js)),
@@ -92,69 +85,71 @@ ui <- fluidPage(
   ),
   # Use a fluidRow so we can make the left column narrower and the right column wider
   fluidRow(
-    # Left: generated text (narrow)
-    column(
-      width = 4,
-      wellPanel(
-        h4("Generated text (read-only)"),
-        tags$textarea(id = "generated_text", rows = 10, style = "width:100%;", readonly = NA),
-        br(),
-        actionButton("copy_btn", "Copy to clipboard"),
-        br(),
-        br(),
-        downloadButton("download_xml", "Download XML", class = "btn-secondary"),
-        br(),
-        br(),
-        fileInput("upload_xml", "Load from XML", accept = c(".xml")),
-        {
-          xml_msg <- if (xml2_available) "XML import/export available." else "Install the xml2 package to enable XML import/export."
-          tags$small(xml_msg)
-        }
-      )
-    ),
-
     # Right: options (wider)
     column(
-      width = 8,
-      h4("Negative AI statement (no AI used)"),
+      width = 7,
+      titlePanel("AIdIT"),
+  h4("AI disclosure for Improved Transparency v0.1"),
+  p(HTML("The system allows for selection of standardised AI usage cases and based on the inputs provided, it generates
+  a standardised disclosure statement that can be copy-pasted into the relevant section of a paper. <br><br>
+
+  To use the tools: select whether AI was not used (<b>section 1A</b> - to generate a default negative statement) or
+  specify the AI model(s) used in <b>section 1B</b>. You can select the number of model used - for each AI system you will be
+  able to provide its name, version and (optionally) the usage date (useful as timestamp in cases when versioning for
+  a particular AI model is not available). <br><br>
+  
+  For each model you will be able to select a number of usage categories, grouped into three main areas: content generation,
+  content refinement and content comparisons. Usage categories include: conceptualisation, data curation,
+  formal analysis, funding acquisition, investigation, methods, visualisation, validation and writing. <br><br>
+  
+  In <b>section 2</b> you can provide additional information about your AI usage, including whether you have supervised the
+  AI outputs, whether your use of AI formally complies with ethical guidelines of an institution or funding body,
+  and whether you have archived the prompts used. You can also provide any other comments that will be added verbatim. <br><br>
+  
+  Once you have provided all the relevant information, click the <i>'Generate text'</i> button to produce the disclosure statement,
+  which will appear in the left-hand panel. You can then copy it to clipboard, or download it as XML for later use.
+  The XML file serves as a reproducible record of your AI usage disclosure and can be re-uploaded to restore the form state
+  in case you need to regenerate or modify the disclosure statement at a later time. At any point you clik the <i>'Clear
+  all inputs'</i> button to reset the form.<br><br>"),
+  style = "max-width: 900px;"),
+
+  hr(),
+
+  # Clear all inputs button
+  tags$div(
+    style = "margin-bottom: 10px;",
+    actionButton("clear_all", "Clear all inputs", class = "btn-warning")
+  ),
+
+      h4("1A: Negative AI statement (no AI used)"),
       checkboxInput("negative",
         "I have not used any AI tools in this work",
-        value = FALSE
+        value = FALSE, width = "60%"
+      ),
+      # disclosure checkbox only visible when negative is checked
+      conditionalPanel(
+        condition = "input.negative == true",
+        checkboxInput("negative_disclosure",
+          "Disclosure: Any AI‑driven tools embedded by default or running unseen in the software used were unavoidable; the authors accept no liability for their presence.",
+          value = FALSE, width = "60%"
+        )
       ),
       hr(),
-  # --- New disclosure questions (placed above AI engines listing)
-  h4("Additional AI disclosure questions"),
-  radioButtons("supervised_verified",
-       label = "1) Selection (yes/no/no intentional use of AI): Have you supervised the AI model and verified its outputs to avoid errors, halucinations and related issues?",
-       choices = c("Yes" = "yes", "No" = "no", "No intentional use of AI" = "no_intent"),
-       selected = NULL),
-  radioButtons("ethics_compliance",
-       label = "2) Have you checked the compliance of your AI usage with ethical guidelines of your institution, the funding agency and any other related entity?",
-       choices = c("Yes" = "yes", "No" = "no"),
-       selected = NULL),
-  radioButtons("prompts_archived",
-       label = "3) Have you archived and made available the representative prompts used in generating the AI content?",
-       choices = c("Yes, in the Supplementary Materials" = "supplementary",
-           "Yes, available upon request" = "upon_request",
-           "No" = "no"),
-       selected = NULL),
-  textAreaInput("other_comments",
-        label = "4) Any other comments (these will be added verbatim to the generated text)",
-        value = "", rows = 3),
-  br(),
-  h4("Listing of AI engines used in the paper:"),
+      # --- New disclosure questions (placed above AI engines listing)
+      h4("1B: Listing of AI engines used in the paper:"),
       # let user choose how many models to enter (default 1)
       numericInput("num_models", "No. of AI models used",
         value = 1, min = 1, max = 10, step = 1, width = "150px"
       ),
+      hr(),
       tags$div(
         class = "ai-table",
         # header row
         fluidRow(
-          column(3, tags$strong("")),
-          column(3, tags$strong("Model name")),
-          column(3, tags$strong("Model version")),
-          column(3, tags$strong("Usage date (YYYY-MM-DD)"))
+          column(2, tags$strong("")),
+          column(2, tags$strong("Model name")),
+          column(2, tags$strong("Model version")),
+          column(2, tags$strong("Usage date (optional)"))
         ),
         # dynamic rows generated server-side
         uiOutput("ai_rows")
@@ -234,21 +229,75 @@ ui <- fluidPage(
       #   )
       # ),
       br(),
-      actionButton("generate", "Generate text", class = "btn-primary")
+      h4("2: Additional AI disclosure questions"),
+      radioButtons("supervised_verified",
+        label = "Have you supervised the AI model and verified its outputs to avoid errors, halucinations and related issues?",
+        choices = c("Yes" = "yes", "No" = "no",
+        "AI engines running in the background or embedded in other software could not be supervised" = "no_intent"), width = "60%",
+        selected = NULL
+      ),
+      radioButtons("ethics_compliance",
+        label = "Have you checked the compliance of your AI usage with ethical guidelines of your institution, the funding agency and any other related entity?",
+        choices = c("Yes" = "yes", "No" = "no"), width = "60%",
+        selected = NULL
+      ),
+      radioButtons("prompts_archived",
+        label = "Have you archived and made available the representative prompts used in generating the AI content?",
+        choices = c(
+          "Yes, in the Supplementary Materials" = "supplementary",
+          "Yes, available upon request" = "upon_request",
+          "No" = "no"
+        ), width = "60%",
+        selected = NULL
+      ),
+      textAreaInput("other_comments",
+        label = "Any other comments (these will be added verbatim to the generated text)",
+        value = "", rows = 3, width = "60%"
+      ),
+      actionButton("generate", "Generate text", class = "btn-primary"),
+      br(),
+      br()
+    ),
+
+    # Left: generated text (narrow)
+    column(
+      width = 4,
+      br(),
+      br(),
+      wellPanel(
+        h4("Generated text (read-only)"),
+        tags$textarea(id = "generated_text", rows = 10, style = "width:100%;", readonly = NA),
+        br(),
+        actionButton("copy_btn", "Copy to clipboard"),
+        br(),
+        br(),
+        downloadButton("download_xml", "Download XML", class = "btn-secondary"),
+        br(),
+        br(),
+        fileInput("upload_xml", "Load from XML", accept = c(".xml")),
+        {
+          xml_msg <- if (xml2_available) "XML import/export available." else "Install the xml2 package to enable XML import/export."
+          tags$small(xml_msg)
+        }
+      )
     )
   )
 )
 
 server <- function(input, output, session) {
   generated <- reactiveVal("")
-  
+
   # Reactive value to hold XML data waiting to be applied
   pending_xml_load <- reactiveVal(NULL)
 
   make_text <- function() {
     # If the user ticks the negative checkbox, return the fixed negative statement
     if (!is.null(input$negative) && isTRUE(input$negative)) {
-      return("No AI tools were intentionally used in this study or in writing this paper.")
+      neg_text <- "No AI tools were intentionally used in this study or in writing this paper."
+      if (!is.null(input$negative_disclosure) && isTRUE(input$negative_disclosure)) {
+        neg_text <- paste(neg_text, "Any AI‑driven tools embedded by default or running unseen in the software used were unavoidable; the authors accept no liability for their presence.")
+      }
+      return(neg_text)
     }
 
     # Gather all selected options from all groups
@@ -262,14 +311,14 @@ server <- function(input, output, session) {
       name <- input[[paste0("ai_name_", i)]]
       ver <- input[[paste0("ai_version_", i)]]
       date <- input[[paste0("ai_date_", i)]]
-      
+
       # Validate date format if provided
       if (!is.null(date) && nzchar(trimws(date))) {
         if (!grepl("^\\d{4}-\\d{2}-\\d{2}$", date)) {
           stop(paste0("Invalid date format for model ", i, ". Please use YYYY-MM-DD format."))
         }
       }
-      
+
       # consider row empty if name is empty
       if (is.null(name) || !nzchar(trimws(name))) {
         return(NULL)
@@ -302,12 +351,12 @@ server <- function(input, output, session) {
     })
     rows <- Filter(function(x) !is.null(x) && nzchar(x$name), rows)
 
-  # global opts (kept for backward compatibility) -- collect all group selections
-  opts <- c(input$group1, input$group2, input$group3, input$group4, input$group5)
-  if (is.null(opts)) opts <- character(0)
-  # remove empty strings / NA
-  opts <- opts[!is.na(opts) & nzchar(opts)]
-  opts_str <- if (length(opts) == 0) "none" else paste(opts, collapse = "; ")
+    # global opts (kept for backward compatibility) -- collect all group selections
+    opts <- c(input$group1, input$group2, input$group3, input$group4, input$group5)
+    if (is.null(opts)) opts <- character(0)
+    # remove empty strings / NA
+    opts <- opts[!is.na(opts) & nzchar(opts)]
+    opts_str <- if (length(opts) == 0) "none" else paste(opts, collapse = "; ")
 
     # per-model usage formatting: "ModelName - use1, use2; Model2 - ..."
     per_model_usage <- vapply(rows, function(r) {
@@ -336,7 +385,7 @@ server <- function(input, output, session) {
     if (!is.null(sv) && sv == "yes") {
       addons <- c(addons, "The authors declare that they have verified and approved all content generated or modified by the AI tools used.")
     } else if (!is.null(sv) && sv == "no_intent") {
-      addons <- c(addons, "Any AI‑driven tools embedded by default or running unseen in the software used were unavoidable; the authors accept no liability for their presence.")
+      addons <- c(addons, "Any AI‑driven tools embedded by default or running unseen in the software used were not supervised due to objective reasons.")
     }
 
     # Q2: ethics_compliance
@@ -368,13 +417,16 @@ server <- function(input, output, session) {
   }
 
   observeEvent(input$generate, {
-    txt <- tryCatch({
-      make_text()
-    }, error = function(e) {
-      showNotification(e$message, type = "error", duration = 5)
-      return(NULL)
-    })
-    
+    txt <- tryCatch(
+      {
+        make_text()
+      },
+      error = function(e) {
+        showNotification(e$message, type = "error", duration = 5)
+        return(NULL)
+      }
+    )
+
     if (!is.null(txt)) {
       generated(txt)
       # set textarea content via JS so it's visible in the readonly tag
@@ -391,19 +443,19 @@ server <- function(input, output, session) {
       current_name <- isolate(input[[paste0("ai_name_", i)]])
       current_version <- isolate(input[[paste0("ai_version_", i)]])
       current_date <- isolate(input[[paste0("ai_date_", i)]])
-      
+
       tagList(
         fluidRow(
-          column(3, tags$div(style = "margin-top:6px;", tags$em("Enter details of AI model used:"))),
-          column(3, textInput(paste0("ai_name_", i), label = NULL, value = if(is.null(current_name)) "" else current_name)),
-          column(3, textInput(paste0("ai_version_", i), label = NULL, value = if(is.null(current_version)) "" else current_version)),
-          column(3, textInput(paste0("ai_date_", i), label = NULL, value = if(is.null(current_date)) "" else current_date, placeholder = "YYYY-MM-DD"))
+          column(2, tags$div(style = "margin-top:6px;", tags$em("Enter details of AI model used:"))),
+          column(2, textInput(paste0("ai_name_", i), label = NULL, value = if (is.null(current_name)) "" else current_name)),
+          column(2, textInput(paste0("ai_version_", i), label = NULL, value = if (is.null(current_version)) "" else current_version)),
+          column(2, textInput(paste0("ai_date_", i), label = NULL, value = if (is.null(current_date)) "" else current_date, placeholder = "YYYY-MM-DD"))
         ),
         # taxonomy for this model: three groups with section labels
         h5("This AI engine was used in content ..."),
         fluidRow(
           column(
-            4,
+            3,
             div(
               class = "group-box group-red",
               tags$div(class = "group-title", "... generation"),
@@ -426,7 +478,7 @@ server <- function(input, output, session) {
             )
           ),
           column(
-            4,
+            3,
             div(
               class = "group-box group-green",
               tags$div(class = "group-title", "... refining"),
@@ -449,7 +501,7 @@ server <- function(input, output, session) {
             )
           ),
           column(
-            4,
+            3,
             div(
               class = "group-box group-blue",
               tags$div(class = "group-title", "... comparisons"),
@@ -471,23 +523,25 @@ server <- function(input, output, session) {
     })
     do.call(tagList, rows_ui)
   })
-  
+
   # Watch for when UI is rendered and apply pending XML data
   observe({
     xml_data <- pending_xml_load()
-    if (is.null(xml_data)) return()
-    
+    if (is.null(xml_data)) {
+      return()
+    }
+
     # Check if the UI inputs exist
     n_models <- length(xml_data$models)
     if (n_models > 0) {
       # Check if first and last inputs exist
       first_exists <- !is.null(input[[paste0("ai_name_1")]])
       last_exists <- !is.null(input[[paste0("ai_name_", n_models)]])
-      
+
       if (!first_exists || !last_exists) {
-        return()  # UI not ready yet
+        return() # UI not ready yet
       }
-      
+
       # Apply the XML data
       isolate({
         i <- 1L
@@ -495,7 +549,7 @@ server <- function(input, output, session) {
           updateTextInput(session, paste0("ai_name_", i), value = model_data$name)
           updateTextInput(session, paste0("ai_version_", i), value = model_data$version)
           updateTextInput(session, paste0("ai_date_", i), value = model_data$date)
-          
+
           # Apply uses
           if (length(model_data$uses) > 0) {
             for (use_val in model_data$uses) {
@@ -504,7 +558,7 @@ server <- function(input, output, session) {
                 for (j in 1:8) {
                   input_id <- paste0("taxA", j, "_", i)
                   # Check if this specific checkbox group contains this choice
-                  choices_subset <- taxA_choices_glob[if(j==1) 1 else if(j==2) 2 else if(j==3) 3:5 else if(j==4) 6 else if(j==5) 7:8 else if(j==6) 9:10 else if(j==7) 11:12 else 13:14]
+                  choices_subset <- taxA_choices_glob[if (j == 1) 1 else if (j == 2) 2 else if (j == 3) 3:5 else if (j == 4) 6 else if (j == 5) 7:8 else if (j == 6) 9:10 else if (j == 7) 11:12 else 13:14]
                   if (use_val %in% unlist(choices_subset)) {
                     current <- input[[input_id]]
                     if (is.null(current)) current <- character(0)
@@ -514,7 +568,7 @@ server <- function(input, output, session) {
               } else if (use_val %in% unlist(taxB_choices_glob)) {
                 for (j in 1:8) {
                   input_id <- paste0("taxB", j, "_", i)
-                  choices_subset <- taxB_choices_glob[if(j==1) 1:2 else if(j==2) 3 else if(j==3) 4 else if(j==4) 5:6 else if(j==5) 7 else if(j==6) 8:9 else if(j==7) 10 else 11:12]
+                  choices_subset <- taxB_choices_glob[if (j == 1) 1:2 else if (j == 2) 3 else if (j == 3) 4 else if (j == 4) 5:6 else if (j == 5) 7 else if (j == 6) 8:9 else if (j == 7) 10 else 11:12]
                   if (use_val %in% unlist(choices_subset)) {
                     current <- input[[input_id]]
                     if (is.null(current)) current <- character(0)
@@ -536,12 +590,12 @@ server <- function(input, output, session) {
           }
           i <- i + 1L
         }
-        
+
         # Apply groups
         for (g in names(xml_data$groups)) {
           updateCheckboxGroupInput(session, g, selected = xml_data$groups[[g]])
         }
-        
+
         # Clear pending data
         pending_xml_load(NULL)
         showNotification("XML imported, form updated", type = "message")
@@ -567,11 +621,12 @@ server <- function(input, output, session) {
     updateNumericInput(session, "num_models", value = 1)
     # reset negative checkbox
     updateCheckboxInput(session, "negative", value = FALSE)
-  # reset new disclosure fields
-  updateRadioButtons(session, "supervised_verified", selected = character(0))
-  updateRadioButtons(session, "ethics_compliance", selected = character(0))
-  updateRadioButtons(session, "prompts_archived", selected = character(0))
-  updateTextAreaInput(session, "other_comments", value = "")
+    updateCheckboxInput(session, "negative_disclosure", value = FALSE)
+    # reset new disclosure fields
+    updateRadioButtons(session, "supervised_verified", selected = character(0))
+    updateRadioButtons(session, "ethics_compliance", selected = character(0))
+    updateRadioButtons(session, "prompts_archived", selected = character(0))
+    updateTextAreaInput(session, "other_comments", value = "")
     # reset checkbox groups
     updateCheckboxGroupInput(session, "group1", selected = character(0))
     updateCheckboxGroupInput(session, "group2", selected = character(0))
@@ -611,11 +666,12 @@ server <- function(input, output, session) {
       xml2::xml_set_attr(doc, "generated_at", as.character(Sys.time()))
       # negative
       xml2::xml_add_child(doc, "negative", as.character(isTRUE(input$negative)))
-  # new disclosure questions
-  xml2::xml_add_child(doc, "supervised_verified", ifelse(is.null(input$supervised_verified), "", input$supervised_verified))
-  xml2::xml_add_child(doc, "ethics_compliance", ifelse(is.null(input$ethics_compliance), "", input$ethics_compliance))
-  xml2::xml_add_child(doc, "prompts_archived", ifelse(is.null(input$prompts_archived), "", input$prompts_archived))
-  xml2::xml_add_child(doc, "other_comments", ifelse(is.null(input$other_comments), "", input$other_comments))
+      xml2::xml_add_child(doc, "negative_disclosure", ifelse(is.null(input$negative_disclosure), "", as.character(isTRUE(input$negative_disclosure))))
+      # new disclosure questions
+      xml2::xml_add_child(doc, "supervised_verified", ifelse(is.null(input$supervised_verified), "", input$supervised_verified))
+      xml2::xml_add_child(doc, "ethics_compliance", ifelse(is.null(input$ethics_compliance), "", input$ethics_compliance))
+      xml2::xml_add_child(doc, "prompts_archived", ifelse(is.null(input$prompts_archived), "", input$prompts_archived))
+      xml2::xml_add_child(doc, "other_comments", ifelse(is.null(input$other_comments), "", input$other_comments))
       # num models
       xml2::xml_add_child(doc, "num_models", as.character(input$num_models))
       # ai models
@@ -682,23 +738,25 @@ server <- function(input, output, session) {
       showNotification("Failed to parse XML", type = "error")
       return()
     }
-    
+
     # Parse and store all XML data
     xml_data <- list()
-    
+
     # negative
     neg <- xml2::xml_text(xml2::xml_find_first(doc, ".//negative"))
     xml_data$negative <- identical(tolower(neg), "true") || identical(neg, "1")
-  # new disclosure questions
-  sv <- xml2::xml_text(xml2::xml_find_first(doc, ".//supervised_verified"))
-  xml_data$supervised_verified <- if (nzchar(sv)) sv else NULL
-  ec <- xml2::xml_text(xml2::xml_find_first(doc, ".//ethics_compliance"))
-  xml_data$ethics_compliance <- if (nzchar(ec)) ec else NULL
-  pa <- xml2::xml_text(xml2::xml_find_first(doc, ".//prompts_archived"))
-  xml_data$prompts_archived <- if (nzchar(pa)) pa else NULL
-  oc <- xml2::xml_text(xml2::xml_find_first(doc, ".//other_comments"))
-  xml_data$other_comments <- if (nzchar(oc)) oc else NULL
-    
+    nd <- xml2::xml_text(xml2::xml_find_first(doc, ".//negative_disclosure"))
+    xml_data$negative_disclosure <- identical(tolower(nd), "true") || identical(nd, "1")
+    # new disclosure questions
+    sv <- xml2::xml_text(xml2::xml_find_first(doc, ".//supervised_verified"))
+    xml_data$supervised_verified <- if (nzchar(sv)) sv else NULL
+    ec <- xml2::xml_text(xml2::xml_find_first(doc, ".//ethics_compliance"))
+    xml_data$ethics_compliance <- if (nzchar(ec)) ec else NULL
+    pa <- xml2::xml_text(xml2::xml_find_first(doc, ".//prompts_archived"))
+    xml_data$prompts_archived <- if (nzchar(pa)) pa else NULL
+    oc <- xml2::xml_text(xml2::xml_find_first(doc, ".//other_comments"))
+    xml_data$other_comments <- if (nzchar(oc)) oc else NULL
+
     # num_models
     nm <- xml2::xml_text(xml2::xml_find_first(doc, ".//num_models"))
     if (nzchar(nm) && !is.na(as.integer(nm))) {
@@ -706,7 +764,7 @@ server <- function(input, output, session) {
     } else {
       xml_data$num_models <- 1
     }
-    
+
     # models
     model_nodes <- xml2::xml_find_all(doc, ".//models/model")
     xml_data$models <- list()
@@ -716,7 +774,7 @@ server <- function(input, output, session) {
       model_data$name <- xml2::xml_text(xml2::xml_find_first(mn, "./name"))
       model_data$version <- xml2::xml_text(xml2::xml_find_first(mn, "./version"))
       model_data$date <- xml2::xml_text(xml2::xml_find_first(mn, "./date"))
-      
+
       # restore per-model uses
       uses <- xml2::xml_find_all(mn, "./uses/use")
       if (length(uses) > 0) {
@@ -727,7 +785,7 @@ server <- function(input, output, session) {
       xml_data$models[[i]] <- model_data
       i <- i + 1L
     }
-    
+
     # groups
     xml_data$groups <- list()
     for (g in c("group1", "group2", "group3", "group4", "group5")) {
@@ -738,18 +796,19 @@ server <- function(input, output, session) {
         xml_data$groups[[g]] <- character(0)
       }
     }
-    
+
     # Update negative checkbox immediately
     updateCheckboxInput(session, "negative", value = xml_data$negative)
-  # Update new disclosure fields (these will be applied when UI is ready)
-  if (!is.null(xml_data$supervised_verified)) updateRadioButtons(session, "supervised_verified", selected = xml_data$supervised_verified)
-  if (!is.null(xml_data$ethics_compliance)) updateRadioButtons(session, "ethics_compliance", selected = xml_data$ethics_compliance)
-  if (!is.null(xml_data$prompts_archived)) updateRadioButtons(session, "prompts_archived", selected = xml_data$prompts_archived)
-  if (!is.null(xml_data$other_comments)) updateTextAreaInput(session, "other_comments", value = xml_data$other_comments)
-    
+    if (!is.null(xml_data$negative_disclosure)) updateCheckboxInput(session, "negative_disclosure", value = xml_data$negative_disclosure)
+    # Update new disclosure fields (these will be applied when UI is ready)
+    if (!is.null(xml_data$supervised_verified)) updateRadioButtons(session, "supervised_verified", selected = xml_data$supervised_verified)
+    if (!is.null(xml_data$ethics_compliance)) updateRadioButtons(session, "ethics_compliance", selected = xml_data$ethics_compliance)
+    if (!is.null(xml_data$prompts_archived)) updateRadioButtons(session, "prompts_archived", selected = xml_data$prompts_archived)
+    if (!is.null(xml_data$other_comments)) updateTextAreaInput(session, "other_comments", value = xml_data$other_comments)
+
     # Update num_models (this will trigger UI re-render)
     updateNumericInput(session, "num_models", value = xml_data$num_models)
-    
+
     # Store the data - the observe() watching pending_xml_load will apply it when UI is ready
     pending_xml_load(xml_data)
   })
