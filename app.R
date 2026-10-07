@@ -117,7 +117,7 @@ ui <- fluidPage(
   Skorb K, Gronowska M, Oles W, Bikmurzina F, Boron N, Zagalska-Neubauer M, Nakagawa S, Lagisz M, Arct A, Rutkowska J. 2026. A systematic map of generative AI
   guidelines and reporting in ecology and evolutionary biology: towards the framework of AI
   disclosure for Improved Transparency (AIdIT). <i>Research Integrity & Peer Review</i>, 11: 57.
-  <a href="https://doi.org/10.1186/s41073-026-00230-1">https://doi.org/10.1186/s41073-026-00230-1</a>"),
+  <a href='https://doi.org/10.1186/s41073-026-00230-1'>https://doi.org/10.1186/s41073-026-00230-1</a>"),
   style = "max-width: 750px; font-size: 85%;"),
 
   hr(),
